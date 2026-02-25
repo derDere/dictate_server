@@ -1,7 +1,7 @@
 {
   "permissions": {
     "allow": [
-      "Bash(cd /c/Users/phill/sources/dictate_server && python main.py 2>&1)"
+      "Bash(python main.py 2>&1)"
     ]
   }
 }

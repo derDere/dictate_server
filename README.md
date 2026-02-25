@@ -1,4 +1,4 @@
-# dictate_server
+# Dictate Server
 
 Diktier-Tool für Windows: Text auf dem iPhone ins Mikrofon sprechen (oder tippen) und er landet direkt in der aktiven Windows-Anwendung — ohne Kabel, ohne Cloud.
 
