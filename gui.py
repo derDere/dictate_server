@@ -1,9 +1,11 @@
 """Tkinter GUI -- small status/control window."""
 import queue
 import tkinter as tk
+from tkinter import ttk
 from http.server import HTTPServer
 
 import qrcode
+import sv_ttk
 from PIL import ImageTk
 
 import server as srv
@@ -18,8 +20,11 @@ class App:
         self.root.title("Dictate Server")
         self.root.resizable(False, False)
 
+        sv_ttk.set_theme("dark")
+        self.root.configure(padx=10, pady=10)
+
         self._http: HTTPServer | None = None
-        self._qr_image = None      # hold reference to prevent GC
+        self._qr_image = None
         self._last_text = ""
 
         self.lan_ip = get_lan_ip()
@@ -28,7 +33,7 @@ class App:
 
         self._build_ui()
         self._center_window()
-        self._on_toggle()      # auto-start server
+        self._on_toggle()
         self._poll_queue()
 
     # ------------------------------------------------------------------
@@ -37,49 +42,49 @@ class App:
     def _build_ui(self):
         p = {"padx": 8, "pady": 4}
 
-        # QR code
-        self._qr_label = tk.Label(self.root, bg="white")
+        # QR code (bg matches dark theme)
+        self._qr_label = tk.Label(self.root)
         self._qr_label.pack(**p)
         self._render_qr()
 
         # URL (read-only, selectable and copyable)
-        url_entry = tk.Entry(self.root, font=("Courier", 9), fg="#555",
-                             relief="flat", justify="center",
-                             readonlybackground=self.root.cget("bg"))
+        url_entry = ttk.Entry(self.root, font=("Courier", 9), justify="center")
         url_entry.insert(0, self.url)
         url_entry.configure(state="readonly")
         url_entry.pack(fill="x", **p)
 
         # PIN row: label | entry | Connect button (centered)
-        pin_row = tk.Frame(self.root)
+        pin_row = ttk.Frame(self.root)
         pin_row.pack(**p)
-        tk.Label(pin_row, text="PIN:").pack(side="left")
+        ttk.Label(pin_row, text="PIN:").pack(side="left")
         self._pin_var = tk.StringVar()
-        pin_entry = tk.Entry(pin_row, textvariable=self._pin_var,
-                             width=8, font=("Courier", 11))
+        pin_entry = ttk.Entry(pin_row, textvariable=self._pin_var,
+                              width=8, font=("Courier", 11))
         pin_entry.pack(side="left", padx=4)
         pin_entry.bind("<Return>", lambda _: self._on_connect())
-        tk.Button(pin_row, text="Connect",
-                  command=self._on_connect).pack(side="left")
+        ttk.Button(pin_row, text="Connect",
+                   command=self._on_connect).pack(side="left")
 
         # Last text button
-        self._last_btn = tk.Button(self.root, text="Last Text",
-                                   width=18, command=self._show_last_text)
+        self._last_btn = ttk.Button(self.root, text="Last Text",
+                                    width=18, command=self._show_last_text)
         self._last_btn.pack(**p)
 
         # Start / Stop button
         self._btn_text = tk.StringVar(value="Start")
-        self._toggle_btn = tk.Button(self.root, textvariable=self._btn_text,
-                                     width=18, command=self._on_toggle)
+        self._toggle_btn = ttk.Button(self.root, textvariable=self._btn_text,
+                                      width=18, command=self._on_toggle)
         self._toggle_btn.pack(**p)
 
     def _render_qr(self):
+        # Pick up the actual background colour from the theme
+        bg = ttk.Style().lookup("TFrame", "background") or "#1c1c1c"
         qr = qrcode.QRCode(box_size=3, border=2)
         qr.add_data(self.url)
         qr.make(fit=True)
-        img = qr.make_image(fill_color="black", back_color="white")
+        img = qr.make_image(fill_color="white", back_color=bg)
         self._qr_image = ImageTk.PhotoImage(img)
-        self._qr_label.configure(image=self._qr_image)
+        self._qr_label.configure(image=self._qr_image, bg=bg)
 
     def _center_window(self):
         self.root.update_idletasks()
@@ -97,13 +102,11 @@ class App:
             _log("GUI    Start")
             self._http = srv.start(self.lan_ip)
             self._btn_text.set("Stop")
-            self._toggle_btn.configure(fg="red")
         else:
             _log("GUI    Stop")
             srv.stop(self._http)
             self._http = None
             self._btn_text.set("Start")
-            self._toggle_btn.configure(fg="black")
 
     def _on_connect(self):
         pin = self._pin_var.get().strip()
