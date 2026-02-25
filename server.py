@@ -1,7 +1,15 @@
 """HTTP server: serves the mobile dictation page and handles auth + text injection."""
 import json
+import os
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
+
+_ICON_PATH = os.path.join(os.path.dirname(__file__), "icon.png")
+try:
+    with open(_ICON_PATH, "rb") as _f:
+        _ICON_BYTES = _f.read()
+except FileNotFoundError:
+    _ICON_BYTES = b""
 
 _MANIFEST = json.dumps({
     "name": "Dictate",
@@ -10,7 +18,8 @@ _MANIFEST = json.dumps({
     "display": "standalone",
     "background_color": "#1a1a1a",
     "theme_color": "#1a1a1a",
-    "orientation": "portrait"
+    "orientation": "portrait",
+    "icons": [{"src": "/icon.png", "sizes": "any", "type": "image/png"}]
 })
 
 import state
@@ -31,6 +40,8 @@ _HTML = """<!DOCTYPE html>
 <meta name="apple-mobile-web-app-title" content="Dictate">
 <meta name="theme-color" content="#1a1a1a">
 <link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon.png">
+<link rel="icon" type="image/png" href="/icon.png">
 <title>Dictate</title>
 <style>
   * {{ box-sizing: border-box; margin: 0; padding: 0; touch-action: manipulation; }}
@@ -220,6 +231,12 @@ class _Handler(BaseHTTPRequestHandler):
 
         elif self.path == "/manifest.json":
             self._respond(200, "application/manifest+json", _MANIFEST.encode())
+
+        elif self.path in ("/icon.png", "/favicon.ico"):
+            if _ICON_BYTES:
+                self._respond(200, "image/png", _ICON_BYTES)
+            else:
+                self.send_error(404)
 
         else:
             _log(f"SERVER GET {self.path} 404")

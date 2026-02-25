@@ -6,7 +6,7 @@ from http.server import HTTPServer
 
 import qrcode
 import sv_ttk
-from PIL import ImageTk
+from PIL import Image, ImageTk
 
 import server as srv
 import state
@@ -31,6 +31,7 @@ class App:
         self.url = f"http://{self.lan_ip}:{state.PORT}"
         _log(f"GUI    LAN IP detected: {self.lan_ip}")
 
+        self._set_icon()
         self._build_ui()
         self._center_window()
         self._on_toggle()
@@ -75,6 +76,14 @@ class App:
         self._toggle_btn = ttk.Button(self.root, textvariable=self._btn_text,
                                       width=18, command=self._on_toggle)
         self._toggle_btn.pack(**p)
+
+    def _set_icon(self):
+        try:
+            img = Image.open("icon.png")
+            self._icon_image = ImageTk.PhotoImage(img)
+            self.root.iconphoto(True, self._icon_image)
+        except Exception:
+            pass
 
     def _render_qr(self):
         # Pick up the actual background colour from the theme

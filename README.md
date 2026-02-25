@@ -4,7 +4,7 @@ Diktier-Tool für Windows: Text auf dem iPhone ins Mikrofon sprechen (oder tippe
 
 Die Idee dahinter: iOS-Diktierfunktion ist sehr gut, aber der Text landet auf dem Handy. Mit `dictate_server` öffnest du eine Webseite auf dem iPhone, diktierst dort deinen Text, tippst auf **Senden** — und der Text wird per `Ctrl+V` in das Fenster eingefügt, das gerade auf dem PC aktiv ist. Editor, Browser, Chat, egal.
 
-<!-- Screenshot hier einfügen -->
+![Dictate Server Fenster](screenshot.png)
 
 ---
 
@@ -50,8 +50,8 @@ Die App öffnet sich dann ohne Safari-Chrome (keine URL-Leiste) wie eine native 
 
 | Button | Funktion |
 |--------|----------|
-| **Senden** | Text in die aktive Windows-App einfügen (Clipboard + Ctrl+V), Textfeld leeren |
-| **Leeren** | Textfeld leeren (mit Bestätigung) |
+| **Send** | Text in die aktive Windows-App einfügen (Clipboard + Ctrl+V), Textfeld leeren |
+| **Clear** | Textfeld leeren (mit Bestätigung) |
 | **Enter** | Enter-Taste in der aktiven Windows-App simulieren |
 
 Der Server ist nur für Geräte im selben Netzwerk erreichbar. Pro Sitzung ist genau ein Gerät autorisiert — ein neues Gerät verbindet sich mit einem eigenen PIN.
