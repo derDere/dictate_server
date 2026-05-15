@@ -3,3 +3,5 @@ pywin32
 qrcode[pil]
 pillow
 sv-ttk
+websockets>=12.0
+cryptography>=42.0

@@ -8,10 +8,22 @@ import qrcode
 import sv_ttk
 from PIL import Image, ImageTk
 
+import config as cfg
 import server as srv
 import state
+from gateway_client import GatewayClient
 from utils import get_lan_ip
 from state import _log
+
+# Status label text and colour for each gateway state
+_GW_LABELS: dict[str, tuple[str, str]] = {
+    "connecting":   ("Verbinde...",                   "#888888"),
+    "waiting":      ("Verbunden – Code eingeben:", "#4caf50"),
+    "pairing":      ("Warte auf Best\xe4tigung...",   "#888888"),
+    "active":       ("Aktive Sitzung (E2E)",          "#4caf50"),
+    "pair_failed":  ("Falscher Code – nochmal:", "#ef5350"),
+    "disconnected": ("Nicht verbunden",               "#555555"),
+}
 
 
 class App:
@@ -26,6 +38,8 @@ class App:
         self._http: HTTPServer | None = None
         self._qr_image = None
         self._last_text = ""
+        self._gw_enabled = False
+        self._gateway = GatewayClient()
 
         self.lan_ip = get_lan_ip()
         self.url = f"http://{self.lan_ip}:{state.PORT}"
@@ -36,6 +50,14 @@ class App:
         self._center_window()
         self._on_toggle()
         self._poll_queue()
+
+        # Restore gateway state from last session
+        if cfg.get("gateway_enabled") and cfg.get("gateway_url"):
+            self._gw_enabled = True
+            self._gw_toggle_btn.configure(
+                bg="#14532d", fg="#86efac", activebackground="#166534", text="ON"
+            )
+            self._gateway.connect(cfg.get("gateway_url"))
 
     # ------------------------------------------------------------------
     # UI construction
@@ -77,6 +99,60 @@ class App:
                                       width=18, command=self._on_toggle)
         self._toggle_btn.pack(**p)
 
+        # ── Online Gateway section ──────────────────────────────────────
+        ttk.Separator(self.root, orient="horizontal").pack(fill="x", padx=8, pady=(6, 2))
+
+        gw_outer = ttk.Frame(self.root)
+        gw_outer.pack(fill="x", padx=8, pady=(2, 6))
+
+        ttk.Label(gw_outer, text="Online Gateway",
+                  font=("TkDefaultFont", 8, "bold")).pack(anchor="w")
+
+        # Row 1: URL entry + ON/OFF toggle
+        url_row = ttk.Frame(gw_outer)
+        url_row.pack(fill="x", pady=(2, 0))
+
+        self._gw_url_var = tk.StringVar(value=cfg.get("gateway_url"))
+        gw_url_entry = ttk.Entry(url_row, textvariable=self._gw_url_var,
+                                  font=("Courier", 8))
+        gw_url_entry.pack(side="left", fill="x", expand=True)
+        gw_url_entry.bind("<FocusOut>", self._on_gw_url_change)
+        gw_url_entry.bind("<Return>",   self._on_gw_url_change)
+
+        self._gw_toggle_btn = tk.Button(
+            url_row, text="OFF", width=5,
+            bg="#7f1d1d", fg="#fca5a5",
+            activebackground="#991b1b", activeforeground="#fca5a5",
+            relief="flat", font=("TkDefaultFont", 9, "bold"),
+            command=self._on_gw_toggle,
+        )
+        self._gw_toggle_btn.pack(side="left", padx=(4, 0))
+
+        # Row 2: status + code entry + Pair button
+        code_row = ttk.Frame(gw_outer)
+        code_row.pack(fill="x", pady=(3, 0))
+
+        self._gw_status_var = tk.StringVar(value="Nicht verbunden")
+        self._gw_status_lbl = ttk.Label(
+            code_row, textvariable=self._gw_status_var,
+            font=("TkDefaultFont", 8), foreground="#555555",
+        )
+        self._gw_status_lbl.pack(side="left", fill="x", expand=True)
+
+        self._gw_pair_btn = ttk.Button(
+            code_row, text="Pair", width=5,
+            command=self._on_gw_pair, state="disabled",
+        )
+        self._gw_pair_btn.pack(side="right")
+
+        self._gw_code_var = tk.StringVar()
+        self._gw_code_entry = ttk.Entry(
+            code_row, textvariable=self._gw_code_var,
+            width=8, font=("Courier", 10), state="disabled",
+        )
+        self._gw_code_entry.bind("<Return>", lambda _: self._on_gw_pair())
+        self._gw_code_entry.pack(side="right", padx=(0, 4))
+
     def _set_icon(self):
         try:
             img = Image.open("icon.png")
@@ -104,7 +180,7 @@ class App:
         self.root.geometry(f"{w}x{h}+{(sw - w) // 2}+{(sh - h) // 2}")
 
     # ------------------------------------------------------------------
-    # Event handlers
+    # LAN server event handlers (unchanged)
     # ------------------------------------------------------------------
     def _on_toggle(self):
         if self._http is None:
@@ -136,6 +212,53 @@ class App:
         txt.configure(state="disabled")
 
     # ------------------------------------------------------------------
+    # Gateway event handlers
+    # ------------------------------------------------------------------
+    def _on_gw_url_change(self, _event=None):
+        cfg.set("gateway_url", self._gw_url_var.get().strip())
+
+    def _on_gw_toggle(self):
+        if self._gw_enabled:
+            # Turn OFF
+            self._gw_enabled = False
+            self._gw_toggle_btn.configure(
+                bg="#7f1d1d", fg="#fca5a5", activebackground="#991b1b", text="OFF"
+            )
+            self._gateway.disconnect()
+            self._set_gw_status("disconnected")
+            cfg.set("gateway_enabled", False)
+        else:
+            # Turn ON — require URL first
+            url = self._gw_url_var.get().strip()
+            if not url:
+                return
+            self._gw_enabled = True
+            self._gw_toggle_btn.configure(
+                bg="#14532d", fg="#86efac", activebackground="#166534", text="ON"
+            )
+            self._gateway.connect(url)
+            cfg.set("gateway_url", url)
+            cfg.set("gateway_enabled", True)
+
+    def _on_gw_pair(self):
+        code = self._gw_code_var.get().strip().upper()
+        if code:
+            self._gateway.submit_code(code)
+            self._gw_code_var.set("")
+
+    def _set_gw_status(self, status: str):
+        label, color = _GW_LABELS.get(status, (status, "#888888"))
+        self._gw_status_var.set(label)
+        self._gw_status_lbl.configure(foreground=color)
+        # Code entry enabled only when we're waiting for user to enter a code
+        code_active = status in ("waiting", "pair_failed")
+        new_state = "normal" if code_active else "disabled"
+        self._gw_code_entry.configure(state=new_state)
+        self._gw_pair_btn.configure(state=new_state)
+        if code_active:
+            self._gw_code_entry.focus_set()
+
+    # ------------------------------------------------------------------
     # Background -> GUI updates
     # ------------------------------------------------------------------
     def _poll_queue(self):
@@ -144,6 +267,8 @@ class App:
                 kind, value = state.gui_queue.get_nowait()
                 if kind == "last_text":
                     self._last_text = value
+                elif kind == "gw_status":
+                    self._set_gw_status(value)
         except queue.Empty:
             pass
         self.root.after(200, self._poll_queue)
