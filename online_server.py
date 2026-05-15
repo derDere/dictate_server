@@ -273,7 +273,7 @@ textarea:read-only { opacity: 0.6; }
 
 <script>
 // ── Constants ────────────────────────────────────────────────────────────
-const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no O I L 0 1
+const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ23456789'; // no 0 1 (equated to O I on PC side)
 const SESSION_INFO = new TextEncoder().encode('dictate_session_v1');
 const CODE_LEN = 6;
 

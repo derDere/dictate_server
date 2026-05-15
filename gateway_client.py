@@ -105,7 +105,7 @@ class GatewayClient:
 
     def submit_code(self, code: str) -> None:
         """Called from GUI thread when the user enters the phone's pairing code."""
-        self._pending_code = code.upper().strip()
+        self._pending_code = code.upper().strip().replace("0", "O").replace("1", "I")
         if self._loop and self._code_event and not self._loop.is_closed():
             self._loop.call_soon_threadsafe(self._code_event.set)
 
